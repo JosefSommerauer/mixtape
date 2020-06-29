@@ -6,20 +6,20 @@ import pluggy
 import gi
 
 gi.require_version("Gst", "1.0")
-from gi.repository import Gst  # type: ignore
+from gi.repository import Gst
 
 from .base import BasePlayer
 from .events import PlayerEvents
 from .plugins import MixtapePlugin, Logger, MessageHandler
 from .spec import PlayerSpec
-
+from .exceptions import PlayerSetStateError
 
 PlayerT = TypeVar("PlayerT", bound="Player")
 MixtapePluginT = Type[MixtapePlugin]
 
 
 @attr.s
-class Player(BasePlayer):
+class Player:
     """
     An asyncio compatible player.
     Interfaces with the `Gst.Bus` with an asyncio file descriptor,
@@ -27,18 +27,31 @@ class Player(BasePlayer):
     allowing for asyncio compatible methods.
     """
 
-    PLUGIN_SPEC: Any = PlayerSpec
-    DEFAULT_PLUGINS: List[MixtapePluginT] = [Logger]
-    REQUIRED_PLUGINS: List[MixtapePluginT] = [MessageHandler]
+    DEFAULT_METHODS = ['ready', 'play', 'pause', 'stop', 'send_eos']
+    DEFAULT_PROPERTIES = ['state', 'sinks', 'sources', 'elements']
 
-    plugins: Type[pluggy.PluginManager] = attr.ib(init=False, repr=False)
+    pipeline: Gst.Pipeline = attr.ib()
+    plugins: Type[pluggy.PluginManager] = attr.ib(repr=False)
     events: PlayerEvents = attr.ib(init=False, default=attr.Factory(PlayerEvents))
 
-    @plugins.default
-    def _plugins(self) -> Type[pluggy.PluginManager]:
-        pm = pluggy.PluginManager("mixtape")
-        pm.add_hookspecs(self.PLUGIN_SPEC)
-        return pm
+    def __del__(self) -> None:
+        """
+        Make sure that the gstreamer pipeline is always cleaned up
+        """
+        if self.state is not Gst.State.NULL:
+            self.teardown()
+
+    @property
+    def state(self) -> Gst.State:
+        """Convenience property for the current pipeline Gst.State"""
+        return self.pipeline.get_state(0)[1]
+
+    def set_state(self, state: Gst.State) -> Tuple[Gst.StateChangeReturn, Gst.State, Gst.State]:
+        """Set pipeline state"""
+        ret = self.pipeline.set_state(state)
+        if ret == Gst.StateChangeReturn.FAILURE:
+            raise PlayerSetStateError
+        return ret
 
     @property
     def hook(self) -> Any:
@@ -68,21 +81,21 @@ class Player(BasePlayer):
 
     async def ready(self) -> Tuple[Gst.StateChangeReturn, Gst.State, Gst.State]:
         """Async override of base.ready"""
-        ret = super()._ready()
+        ret = self.set_state(Gst.State.READY)
         await self.events.wait_for_state(Gst.State.READY)
         self.hook.on_ready()
         return ret
 
     async def play(self) -> Tuple[Gst.StateChangeReturn, Gst.State, Gst.State]:
         """Async override of base.play"""
-        ret = super()._play()
+        ret = self.set_state(Gst.State.PLAYING)
         await self.events.wait_for_state(Gst.State.PLAYING)
         self.hook.on_play()
         return ret
 
     async def pause(self) -> Tuple[Gst.StateChangeReturn, Gst.State, Gst.State]:
         """Async override of base.pause"""
-        ret = super()._pause()
+        ret = self.set_state(Gst.State.PAUSE)
         await self.events.wait_for_state(Gst.State.PAUSED)
         self.hook.on_pause()
         return ret
@@ -105,35 +118,35 @@ class Player(BasePlayer):
     def setup(self) -> None:
         """Setup needs a running asyncio loop"""
         self.hook.setup()
-        super().setup()
         self.events.setup.set()
 
     def teardown(self) -> None:
         """Cleanup player references to loop and gst resources"""
         self.hook.teardown()
-        super().teardown()
+        if self.state is not Gst.State.NULL:
+            self.set_state(Gst.State.NULL)
         self.events.teardown.set()
 
     # -- class factories -- #
 
-    @classmethod
-    async def create(
-        cls: Type[PlayerT], pipeline: Gst.Pipeline, plugins: Optional[List[MixtapePluginT]] = None
-    ) -> PlayerT:
-        """Player factory from a given pipeline that calls setup by default"""
-        player = cls(pipeline)
-        if plugins is None:
-            plugins = cls.REQUIRED_PLUGINS + cls.DEFAULT_PLUGINS
-        for plugin in plugins:
-            player.plugins.register(plugin(player))
-        player.setup()
-        return player
+    # @classmethod
+    # async def create(
+    #     cls: Type[PlayerT], pipeline: Gst.Pipeline, plugins: Optional[List[MixtapePluginT]] = None
+    # ) -> PlayerT:
+    #     """Player factory from a given pipeline that calls setup by default"""
+    #     player = cls(pipeline)
+    #     if plugins is None:
+    #         plugins = cls.REQUIRED_PLUGINS + cls.DEFAULT_PLUGINS
+    #     for plugin in plugins:
+    #         player.plugins.register(plugin(player))
+    #     player.setup()
+    #     return player
 
-    @classmethod
-    async def from_description(
-        cls: Type[PlayerT], description: str, plugins: Optional[List[MixtapePluginT]] = None
-    ) -> PlayerT:
-        """Player factory from a pipeline description"""
-        pipeline = Gst.parse_launch(description)
-        assert isinstance(pipeline, Gst.Pipeline)
-        return await cls.create(pipeline=pipeline, plugins=plugins)
+    # @classmethod
+    # async def from_description(
+    #     cls: Type[PlayerT], description: str, plugins: Optional[List[MixtapePluginT]] = None
+    # ) -> PlayerT:
+    #     """Player factory from a pipeline description"""
+    #     pipeline = Gst.parse_launch(description)
+    #     assert isinstance(pipeline, Gst.Pipeline)
+    #     return await cls.create(pipeline=pipeline, plugins=plugins)

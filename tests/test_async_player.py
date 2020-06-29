@@ -12,6 +12,7 @@ from mixtape.exceptions import PlayerSetStateError
 
 SIMPLE_PIPELINE_DESCRIPTION = """videotestsrc ! queue ! fakesink"""
 ERROR_PIPELINE_DESCRIPTION = "filesrc ! queue ! fakesink"
+OTHER_ERROR_PIPELINE = "pulsesrc ! queue ! fakesink"
 
 
 @pytest.fixture
@@ -48,13 +49,14 @@ async def test_player_async_methods(pipeline, mocker, method, state):
     player.teardown()
 
 
+@pytest.mark.parametrize("error_pipeline", [ERROR_PIPELINE_DESCRIPTION, OTHER_ERROR_PIPELINE])
 @pytest.mark.asyncio
-async def test_async_player_exception(Gst):
+async def test_async_player_exception(Gst, error_pipeline):
     """
     If we get a direct error from Gst.pipeline.set_state
     an exception should be returned inmediately
     """
-    pipeline = Gst.parse_launch(ERROR_PIPELINE_DESCRIPTION)
+    pipeline = Gst.parse_launch(error_pipeline)
     player = Player(pipeline)
     player.setup()
 

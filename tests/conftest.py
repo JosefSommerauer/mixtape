@@ -31,8 +31,8 @@ def Gst():  # noqa
     return GstCls
 
 
-@pytest.fixture
-def player(Gst):
-    from mixtape import Player
+# @pytest.fixture
+# def player(Gst):
+#     from mixtape import Player
 
-    return Player
+#     return Player

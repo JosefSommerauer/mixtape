@@ -42,3 +42,7 @@ class PlayerSpec:
     @hookspec
     def on_stop(self) -> None:
         pass
+
+    @hookspec
+    def on_eos(self) -> None:
+        pass

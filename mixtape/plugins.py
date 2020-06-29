@@ -5,7 +5,7 @@ from typing import Any, MutableMapping, Callable, Optional
 import gi
 
 gi.require_version("Gst", "1.0")
-from gi.repository import Gst  # type: ignore
+from gi.repository import Gst
 
 from mixtape.spec import hookimpl
 from mixtape.exceptions import PlayerPipelineError
@@ -56,7 +56,7 @@ class Logger(MixtapePlugin):
 
     def __init__(self, player: Any):
         super().__init__(player)
-        self.logger: logging.Logger = logging.getLogger(f"{self.player.__module__}.self")
+        self.logger: logging.Logger = logging.getLogger(f"{self.player.__module__}")
 
     @hookimpl
     def setup(self) -> None:

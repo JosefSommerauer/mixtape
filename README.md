@@ -201,3 +201,26 @@ We are Groot.
 [Pypi page]: https://img.shields.io/pypi/v/mixtape.svg
 [Pypi license]: https://img.shields.io/pypi/l/mixtape.svg
 [Pypi version]: https://img.shields.io/pypi/pyversions/mixtape.svg
+
+
+
+### Usage 
+
+
+p = await Player.create(
+    description = description,
+    plugins = ["foo", "bar"]
+    **conf
+
+)
+
+p = mixtape.from_description(
+    description = description,
+    plugins = [""],
+    **kwargs
+)
+
+
+cli usage
+
+mixtape videotestsrc ! fakesink
