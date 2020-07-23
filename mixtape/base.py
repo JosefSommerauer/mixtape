@@ -1,5 +1,8 @@
 import logging
-from typing import Tuple, TypeVar
+from typing import Any, Optional, Type, TypeVar, Tuple, List
+
+import attr
+import pluggy
 
 import attr
 import gi
@@ -20,7 +23,8 @@ class BasePlayer:
     """Player base player"""
 
     pipeline: Gst.Pipeline = attr.ib()
-
+    plugins: Type[pluggy.PluginManager] = attr.ib(repr=False)
+    
     def __del__(self) -> None:
         """
         Make sure that the gstreamer pipeline is always cleaned up
@@ -41,6 +45,29 @@ class BasePlayer:
             raise PlayerSetStateError
         return ret
 
+    @property
+    def hook(self) -> Any:
+        """Convenience shortcut for pm hook"""
+        return self.plugins.hook
+
+    @property
+    def sinks(self) -> List[Any]:
+        """Returns all sink elements"""
+        return list(self.pipeline.iterate_sinks())
+
+    @property
+    def sources(self) -> List[Any]:
+        """Return all source elements"""
+        return list(self.pipeline.iterate_sources())
+
+    @property
+    def elements(self) -> List[Any]:
+        """Return all pipeline elements"""
+        return list(self.pipeline.iterate_elements())
+
+    def get_elements_by_gtype(self, gtype: Any) -> List[Any]:
+        """Return all elements in pipeline that match gtype"""
+        return [e for e in self.elements if e.get_factory().get_element_type() == gtype]
     def setup(self) -> None:
         """Player setup: meant to be used with hooks or subclassed"""
 
