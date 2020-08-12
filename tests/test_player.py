@@ -1,36 +1,26 @@
 # type: ignore
-import asyncio
 import pytest
+import asyncio
 
 import gi
 
 gi.require_version("Gst", "1.0")
 from gi.repository import Gst
 
-from mixtape import Player
+from mixtape.player import Player
 from mixtape.exceptions import PlayerSetStateError
 
-SIMPLE_PIPELINE_DESCRIPTION = """videotestsrc ! queue ! fakesink"""
-ERROR_PIPELINE_DESCRIPTION = "filesrc ! queue ! fakesink"
-OTHER_ERROR_PIPELINE = "pulsesrc ! queue ! fakesink"
 
+def test_base_player_init_and_default_props(pipeline):
+    player = Player(pipeline=pipeline)
 
-@pytest.fixture
-def pipeline(Gst):
-    """Make sure test pipeline is correct and test env setup"""
-    pipeline = Gst.parse_launch(SIMPLE_PIPELINE_DESCRIPTION)
-    assert isinstance(pipeline, Gst.Pipeline)
-    return pipeline
+    assert player.pipeline == pipeline
+    assert player.state == Gst.State.NULL
 
 
 @pytest.mark.parametrize(
     "method, state",
-    [
-        ("ready", Gst.State.READY),
-        ("play", Gst.State.PLAYING),
-        ("pause", Gst.State.PAUSED),
-        ("stop", Gst.State.NULL),
-    ],
+    [("ready", Gst.State.READY), ("play", Gst.State.PLAYING), ("pause", Gst.State.PAUSED)],
 )
 @pytest.mark.asyncio
 async def test_player_async_methods(pipeline, mocker, method, state):
@@ -39,25 +29,18 @@ async def test_player_async_methods(pipeline, mocker, method, state):
     spy = mocker.spy(player.pipeline, "set_state")
 
     action = getattr(player, method)
-
-    try:
-        await asyncio.wait_for(action(), 1)
-    except Exception:
-        # in this test we just care that set_state is being called correctly
-        pass
+    await asyncio.wait_for(action(), 1)
     spy.assert_called_with(state)
     player.teardown()
 
 
-@pytest.mark.parametrize("error_pipeline", [ERROR_PIPELINE_DESCRIPTION, OTHER_ERROR_PIPELINE])
 @pytest.mark.asyncio
-async def test_async_player_exception(Gst, error_pipeline):
+async def test_async_player_exception(error_pipeline):
     """
     If we get a direct error from Gst.pipeline.set_state
     an exception should be returned inmediately
     """
-    pipeline = Gst.parse_launch(error_pipeline)
-    player = Player(pipeline)
+    player = Player(error_pipeline)
     player.setup()
 
     with pytest.raises(PlayerSetStateError):
@@ -66,14 +49,14 @@ async def test_async_player_exception(Gst, error_pipeline):
 
 
 @pytest.mark.asyncio
-async def test_async_player_sequence(Gst, pipeline):
+async def test_async_player_sequence(pipeline):
     """
     If we get a direct error from Gst.pipeline.set_state
     an exception should be returned inmediately
     """
     player = await Player.create(pipeline)
 
-    sequence = ["ready", "play", "pause", "stop"]
+    sequence = ["ready", "play", "pause", "play", "stop"]
     for step in sequence:
         await getattr(player, step)()
         await asyncio.sleep(1)

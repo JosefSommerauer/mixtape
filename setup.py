@@ -21,7 +21,7 @@ EXTRAS = {
 
 setup(
     name="mixtape",
-    version="0.5.0.dev0",
+    version="0.6.0.dev0",
     author="Ashley Camba Garrido",
     author_email="ashwoods@gmail.com",
     url="https://github.com/ashwoods/mixtape",
@@ -30,7 +30,10 @@ setup(
     packages=find_packages(exclude=("tests", "tests.*")),
     # PEP 561
     package_data={"mixtape": ["py.typed"]},
-    entry_points={"mixtape": ["messages = mixtape.messages:MessageQueuePlugin"]},
+    entry_points={
+        "mixtape": ["logger = mixtape.plugins.logger"],
+        'console_scripts': ['mixtape = mixtape.cli:play'],
+        },
     zip_safe=False,
     license="MIT",
     tests_require=TEST_DEPS,

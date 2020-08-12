@@ -31,8 +31,22 @@ def Gst():  # noqa
     return GstCls
 
 
-# @pytest.fixture
-# def player(Gst):
-#     from mixtape import Player
+@pytest.fixture
+def pipeline(Gst):
+    """Make sure test pipeline is correct and test env setup"""
 
-#     return Player
+    SIMPLE_PIPELINE_DESCRIPTION = """videotestsrc ! queue ! fakesink"""
+
+    p = Gst.parse_launch(SIMPLE_PIPELINE_DESCRIPTION)
+    return p
+
+
+@pytest.fixture
+def error_pipeline(Gst):
+    """Make sure test pipeline is correct and test env setup"""
+
+    ERROR_PIPELINE_DESCRIPTION = "filesrc ! queue ! fakesink"
+
+    p = Gst.parse_launch(ERROR_PIPELINE_DESCRIPTION)
+    return p
+
