@@ -42,6 +42,7 @@ class AsyncPlayer(BasePlayer):
             Gst.MessageType.QOS: self.on_qos,
             Gst.MessageType.ERROR: self.on_error,
             Gst.MessageType.EOS: self.on_eos,
+
             Gst.MessageType.STATE_CHANGED: self.on_state_changed,
             Gst.MessageType.ASYNC_DONE: self.on_async_done,
         }
@@ -57,19 +58,22 @@ class AsyncPlayer(BasePlayer):
     async def play(self) -> Tuple[Gst.StateChangeReturn, Gst.State, Gst.State]:  # type: ignore
         """Async override of base.play"""
         ret = super().play()
-        await self.events.wait_for_state(Gst.State.PLAYING)
+        if ret != Gst.StateChangeReturn.FAILURE:
+            await self.events.wait_for_state(Gst.State.PLAYING)
         return ret
 
     async def pause(self) -> Tuple[Gst.StateChangeReturn, Gst.State, Gst.State]:  # type: ignore
         """Async override of base.pause"""
         ret = super().pause()
-        await self.events.wait_for_state(Gst.State.PAUSED)
+        if ret != Gst.StateChangeReturn.FAILURE:
+            await self.events.wait_for_state(Gst.State.PAUSED)
         return ret
 
     # fmt: off
     async def stop(self, send_eos: bool = True, teardown: bool = False) -> Tuple[Gst.StateChangeReturn, Gst.State, Gst.State]:  # type: ignore
         """Async override of base.stop"""
     # fmt: on
+        logger.error("stop playerGST_STATE_CHANGE_FAILURE")
         if send_eos:
             await self.send_eos()
         ret = self.set_state(Gst.State.NULL)
@@ -81,7 +85,11 @@ class AsyncPlayer(BasePlayer):
 
     async def send_eos(self) -> bool:  # type: ignore
         ret = self.pipeline.send_event(Gst.Event.new_eos())
-        await self.events.eos.wait()
+        state = self.state
+        logger.error(f"send eos {ret} {state}")
+        if ret and self.state == Gst.State.PLAYING:
+            await self.events.eos.wait()
+            logger.error(f"send eos {ret}")
         return ret
 
     # -- bus message handling -- #
@@ -126,7 +134,7 @@ class AsyncPlayer(BasePlayer):
 
         self.teardown()
         self.events.error.set()
-        raise PlayerPipelineError(err)
+        #raise PlayerPipelineError(err)
 
     def on_eos(self, bus: Gst.Bus, message: Gst.Message) -> None:
         """

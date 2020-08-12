@@ -53,8 +53,8 @@ class BasePlayer:
             logger.warning("Calling set_state without calling setup. Trying to do this now.")
             self.setup()
         ret = self.pipeline.set_state(state)
-        if ret == Gst.StateChangeReturn.FAILURE:
-            raise PlayerSetStateError
+        #if ret == Gst.StateChangeReturn.FAILURE:
+        #    raise PlayerSetStateError
         return ret
 
     def setup(self) -> None:
